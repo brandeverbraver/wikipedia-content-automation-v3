@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wikipedia – Base Content Automation</title>
+<style>
+  :root{
+    --bg:#ffffff; --text:#111; --muted:#6b7280; --hint:#9ca3af;
+    --panel:#f8fafc; --border:#e5e7eb;
+    --accent:#000; --accentText:#fff;
+    --radius:12px; --pad:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial}
+  .app{padding:14px 14px 16px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .brand{font-family:Georgia,"Times New Roman",serif;font-size:18px;letter-spacing:.2px}
+  .subtitle{color:var(--muted);font-size:12px;margin-top:2px}
+  nav.tabs{display:flex;gap:14px;border-bottom:1px solid var(--border);margin-top:6px}
+  .tab{padding:8px 0;margin-bottom:-1px;color:var(--muted);cursor:pointer;user-select:none}
+  .tab.active{color:var(--text);font-weight:600;border-bottom:2px solid var(--text)}
+  .panel{margin-top:14px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:var(--pad)}
+  .stack{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+  .row{display:flex;gap:8px;align-items:center;margin:6px 0}
+  label{font-weight:600}
+  .sub{color:var(--muted);font-weight:600}
+  select,input[type="text"]{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+  select:focus,input[type="text"]:focus{outline:2px solid rgba(0,0,0,.35)}
+  .radio-row{display:flex;gap:10px;flex-wrap:wrap}
+  .radio{display:flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);
+    border-radius:999px;background:#fff;cursor:pointer}
+  .divider{height:1px;background:var(--border);margin:12px 0}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;color:var(--muted);
+    padding:8px 10px;border:1px dashed var(--border);border-radius:10px;background:#fff}
+  .actions{display:flex;gap:8px}
+  .btn{appearance:none;border:none;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;
+    background:var(--accent);color:var(--accentText)}
+  .btn.secondary{background:#1111110d;color:#111;border:1px solid var(--border);font-weight:600}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .hint{color:var(--hint);font-size:12px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;background:#111;color:#fff;
+    padding:10px 14px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .18s ease}
+  .toast.show{opacity:1}
+  .foot{margin-top:10px;color:var(--hint);text-align:center;font-size:11px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="brand">Wikipedia</div>
+      <div class="subtitle">Base Content Automation</div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Plugin sections">
+    <div class="tab active" data-tab="build" role="tab" aria-selected="true">Build</div>
+    <div class="tab" data-tab="sync" role="tab" aria-selected="false">Sync</div>
+    <div class="tab" data-tab="review" role="tab" aria-selected="false">Review</div>
+    <div class="tab" data-tab="export" role="tab" aria-selected="false">Export</div>
+  </nav>
+
+  <!-- BUILD -->
+  <section class="panel" id="panel-build" role="tabpanel" aria-labelledby="build">
+    <div class="stack">
+      <label>Build Scope</label>
+      <div class="radio-row" id="build-scope">
+        <label class="radio"><input type="radio" name="scope" value="month" checked> Entire Month</label>
+        <label class="radio"><input type="radio" name="scope" value="dates"> Selected Date(s)</label>
+        <label class="radio"><input type="radio" name="scope" value="single"> Single Post</label>
+      </div>
+
+      <div id="build-controls">
+        <!-- Month controls -->
+        <div data-scope="month" class="stack">
+          <div class="stack">
+            <span class="sub">Month</span>
+            <select id="month-select">
+              <option value="" disabled selected>Select month</option>
+              <option>2025-08</option><option>2025-09</option><option>2025-10</option>
+            </select>
+          </div>
+          <div class="stack">
+            <span class="sub">Layout Chain</span>
+            <select id="chain-month">
+              <option value="" disabled selected>Select chain</option>
+              <option>Low</option><option>Base</option><option>Medium</option><option>High</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Date-range controls -->
+        <div data-scope="dates" class="stack" hidden>
+          <div class="row">
+            <div class="stack" style="flex:1">
+              <span class="sub">Start Date</span>
+              <input id="date-start" type="text" placeholder="YYYY-MM-DD" aria-label="Start date">
+            </div>
+            <div class="stack" style="flex:1">
+              <span class="sub">End Date</span>
+              <input id="date-end" type="text" placeholder="YYYY-MM-DD" aria-label="End date">
+            </div>
+          </div>
+          <div class="stack">
+            <span class="sub">Layout Chain</span>
+            <select id="chain-dates">
+              <option value="" disabled selected>Select chain</option>
+              <option>Low</option><option>Base</option><option>Medium</option><option>High</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Single post controls -->
+        <div data-scope="single" class="stack" hidden>
+          <div class="stack">
+            <span class="sub">Post (Date / Article)</span>
+            <select id="post-select">
+              <option value="" disabled selected>Select post</option>
+              <option>2025-09-10 / Climate-Report</option>
+              <option>2025-09-12 / Tech-Policy</option>
+              <option>2025-09-15 / Heritage-Spotlight</option>
+            </select>
+          </div>
+          <div class="stack">
+            <span class="sub">Layout Chain</span>
+            <select id="chain-single">
+              <option value="" disabled selected>Select chain</option>
+              <option>Low</option><option>Base</option><option>Medium</option><option>High</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="statusbar">
+        <div class="hint">Destination: current Figma page</div>
+        <div class="actions">
+          <button class="btn" id="btn-build">Build</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYNC -->
+  <section class="panel" id="panel-sync" role="tabpanel" aria-labelledby="sync" hidden>
+    <div class="stack">
+      <div class="statusbar">
+        <div id="sync-target" class="hint">Target: 0 selected</div>
+        <div class="actions">
+          <button class="btn" id="btn-sync">Sync Selected</button>
+        </div>
+      </div>
+      <div class="hint">Sync updates text & images from Airtable (when wired). UI-only for now.</div>
+    </div>
+  </section>
+
+  <!-- REVIEW -->
+  <section class="panel" id="panel-review" role="tabpanel" aria-labelledby="review" hidden>
+    <div class="stack">
+      <div class="statusbar">
+        <div id="review-target" class="hint">Target: 0 selected</div>
+        <div class="actions">
+          <button class="btn" id="btn-review">Push Previews</button>
+        </div>
+      </div>
+      <div class="hint">Generates preview images and sends to Airtable for client review (future wiring).</div>
+    </div>
+  </section>
+
+  <!-- EXPORT -->
+  <section class="panel" id="panel-export" role="tabpanel" aria-labelledby="export" hidden>
+    <div class="stack">
+      <div class="statusbar">
+        <div id="export-target" class="hint">Target: 0 selected</div>
+        <div class="actions">
+          <button class="btn" id="btn-export">Export Selected</button>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="sub">Export structure (automatic)</div>
+        <div class="hint">
+          Root folder = <b>Section name</b><br/>
+          Subfolders: <code>FEED/</code> and <code>STORY/</code><br/>
+          Filenames: <code>date_article-title_feed_1</code>, <code>..._feed_2</code>, <code>..._story_1</code>, etc.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">UI-only prototype • no actions wired</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ------- Tab switching -------
+  const tabs = document.querySelectorAll('.tab');
+  const panels = {
+    build: document.getElementById('panel-build'),
+    sync: document.getElementById('panel-sync'),
+    review: document.getElementById('panel-review'),
+    export: document.getElementById('panel-export')
+  };
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    Object.values(panels).forEach(p => p.hidden = true);
+    t.classList.add('active');
+    panels[t.dataset.tab].hidden = false;
+  }));
+
+  // ------- Build scope toggle -------
+  const scopeRadios = document.querySelectorAll('input[name="scope"]');
+  const scopePanels = document.querySelectorAll('#build-controls > [data-scope]');
+  function updateScope() {
+    const val = document.querySelector('input[name="scope"]:checked').value;
+    scopePanels.forEach(p => p.hidden = p.getAttribute('data-scope') !== val);
+  }
+  scopeRadios.forEach(r => r.addEventListener('change', updateScope));
+  updateScope();
+
+  // ------- Toast helper -------
+  const toast = document.getElementById('toast');
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 1600);
+  }
+
+  // ------- Buttons (UI-only) -------
+  document.getElementById('btn-build').addEventListener('click', () => showToast('UI-only: Build preview'));
+  document.getElementById('btn-sync').addEventListener('click', () => showToast('UI-only: Sync selected'));
+  document.getElementById('btn-review').addEventListener('click', () => showToast('UI-only: Push previews'));
+  document.getElementById('btn-export').addEventListener('click', () => showToast('UI-only: Export selected'));
+
+  // ------- Selection status (updated by code.js) -------
+  const syncT = document.getElementById('sync-target');
+  const reviewT = document.getElementById('review-target');
+  const exportT = document.getElementById('export-target');
+
+  window.onmessage = (event) => {
+    const msg = event.data && event.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === 'selection-summary') {
+      const { nodes, frames, sections } = msg.payload;
+      const base = `Target: ${nodes} selected (${frames} frame-like)`;
+      const sec = sections && sections.length ? ` • Sections: ${sections.join(', ')}` : '';
+      const text = base + sec;
+      syncT.textContent = text;
+      reviewT.textContent = text;
+      exportT.textContent = text;
+    }
+  };
+
+  // For standalone preview (without code.js), seed a fake status:
+  setTimeout(() => {
+    if (syncT.textContent.includes('0 selected')) {
+      const fake = 'Target: 2 selected (2 frame-like) • Sections: 2025-09-10_Climate-Report';
+      syncT.textContent = fake; reviewT.textContent = fake; exportT.textContent = fake;
+    }
+  }, 400);
+</script>
+</body>
+</html>
