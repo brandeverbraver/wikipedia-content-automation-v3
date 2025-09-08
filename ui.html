@@ -44,6 +44,14 @@
     padding:10px 14px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .18s ease}
   .toast.show{opacity:1}
   .foot{margin-top:10px;color:var(--hint);text-align:center;font-size:11px}
+  /* preview grid */
+  .grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}
+  .card{border:1px solid var(--border);border-radius:10px;background:#fff;overflow:hidden}
+  .card-head{padding:8px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px}
+  .card-path{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:11px;color:#111}
+  .card-meta{font-size:11px;color:var(--muted)}
+  .card-img{display:block;width:100%;height:auto}
+  .progress{font-size:12px;color:var(--muted);margin-top:6px}
 </style>
 </head>
 <body>
@@ -62,7 +70,7 @@
     <div class="tab" data-tab="export" role="tab" aria-selected="false">Export</div>
   </nav>
 
-  <!-- BUILD -->
+  <!-- BUILD (unchanged visuals) -->
   <section class="panel" id="panel-build" role="tabpanel" aria-labelledby="build">
     <div class="stack">
       <label>Build Scope</label>
@@ -73,7 +81,6 @@
       </div>
 
       <div id="build-controls">
-        <!-- Month controls -->
         <div data-scope="month" class="stack">
           <div class="stack">
             <span class="sub">Month</span>
@@ -91,7 +98,6 @@
           </div>
         </div>
 
-        <!-- Date-range controls -->
         <div data-scope="dates" class="stack" hidden>
           <div class="row">
             <div class="stack" style="flex:1">
@@ -112,7 +118,6 @@
           </div>
         </div>
 
-        <!-- Single post controls -->
         <div data-scope="single" class="stack" hidden>
           <div class="stack">
             <span class="sub">Post (Date / Article)</span>
@@ -143,7 +148,7 @@
     </div>
   </section>
 
-  <!-- SYNC -->
+  <!-- SYNC (still UI-only) -->
   <section class="panel" id="panel-sync" role="tabpanel" aria-labelledby="sync" hidden>
     <div class="stack">
       <div class="statusbar">
@@ -152,11 +157,11 @@
           <button class="btn" id="btn-sync">Sync Selected</button>
         </div>
       </div>
-      <div class="hint">Sync updates text & images from Airtable (when wired). UI-only for now.</div>
+      <div class="hint">UI-only for now (no Airtable yet).</div>
     </div>
   </section>
 
-  <!-- REVIEW -->
+  <!-- REVIEW (still UI-only) -->
   <section class="panel" id="panel-review" role="tabpanel" aria-labelledby="review" hidden>
     <div class="stack">
       <div class="statusbar">
@@ -165,11 +170,11 @@
           <button class="btn" id="btn-review">Push Previews</button>
         </div>
       </div>
-      <div class="hint">Generates preview images and sends to Airtable for client review (future wiring).</div>
+      <div class="hint">Will upload previews to Airtable in a later phase.</div>
     </div>
   </section>
 
-  <!-- EXPORT -->
+  <!-- EXPORT (now with preview grid) -->
   <section class="panel" id="panel-export" role="tabpanel" aria-labelledby="export" hidden>
     <div class="stack">
       <div class="statusbar">
@@ -183,19 +188,21 @@
         <div class="hint">
           Root folder = <b>Section name</b><br/>
           Subfolders: <code>FEED/</code> and <code>STORY/</code><br/>
-          Filenames: <code>date_article-title_feed_1</code>, <code>..._feed_2</code>, <code>..._story_1</code>, etc.
+          Filenames: <code>date_article-title_feed_1</code>, <code>..._story_1</code>, etc.
         </div>
       </div>
+
+      <div id="export-progress" class="progress" hidden>Preparing previews…</div>
+      <div id="preview-grid" class="grid"></div>
     </div>
   </section>
 
-  <div class="foot">UI-only prototype • no actions wired</div>
+  <div class="foot">Alpha.1 • preview only • no disk writes</div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-  // ------- Tab switching -------
   const tabs = document.querySelectorAll('.tab');
   const panels = {
     build: document.getElementById('panel-build'),
@@ -210,7 +217,7 @@
     panels[t.dataset.tab].hidden = false;
   }));
 
-  // ------- Build scope toggle -------
+  // Build scope toggle
   const scopeRadios = document.querySelectorAll('input[name="scope"]');
   const scopePanels = document.querySelectorAll('#build-controls > [data-scope]');
   function updateScope() {
@@ -220,7 +227,7 @@
   scopeRadios.forEach(r => r.addEventListener('change', updateScope));
   updateScope();
 
-  // ------- Toast helper -------
+  // Toast
   const toast = document.getElementById('toast');
   function showToast(msg){
     toast.textContent = msg;
@@ -228,21 +235,38 @@
     setTimeout(()=>toast.classList.remove('show'), 1600);
   }
 
-  // ------- Buttons (UI-only) -------
-  document.getElementById('btn-build').addEventListener('click', () => showToast('UI-only: Build preview'));
-  document.getElementById('btn-sync').addEventListener('click', () => showToast('UI-only: Sync selected'));
-  document.getElementById('btn-review').addEventListener('click', () => showToast('UI-only: Push previews'));
-  document.getElementById('btn-export').addEventListener('click', () => showToast('UI-only: Export selected'));
-
-  // ------- Selection status (updated by code.js) -------
+  // Targets
   const syncT = document.getElementById('sync-target');
   const reviewT = document.getElementById('review-target');
   const exportT = document.getElementById('export-target');
 
+  // Progress + grid
+  const progress = document.getElementById('export-progress');
+  const grid = document.getElementById('preview-grid');
+
+  // Buttons
+  document.getElementById('btn-build').addEventListener('click', () => showToast('UI-only: Build preview'));
+  document.getElementById('btn-sync').addEventListener('click', () => showToast('UI-only: Sync selected'));
+  document.getElementById('btn-review').addEventListener('click', () => showToast('UI-only: Push previews'));
+  document.getElementById('btn-export').addEventListener('click', () => {
+    // Ask plugin to export preview bytes for selected frames
+    progress.hidden = false;
+    grid.innerHTML = "";
+    parent.postMessage({ pluginMessage: { type: "export-preview" } }, "*");
+  });
+
+  // Bytes -> URL
+  function bytesToUrl(bytes) {
+    const blob = new Blob([new Uint8Array(bytes)], { type: "image/png" });
+    return URL.createObjectURL(blob);
+  }
+
+  // Receive messages from plugin
   window.onmessage = (event) => {
     const msg = event.data && event.data.pluginMessage;
     if (!msg) return;
-    if (msg.type === 'selection-summary') {
+
+    if (msg.type === "selection-summary") {
       const { nodes, frames, sections } = msg.payload;
       const base = `Target: ${nodes} selected (${frames} frame-like)`;
       const sec = sections && sections.length ? ` • Sections: ${sections.join(', ')}` : '';
@@ -251,9 +275,51 @@
       reviewT.textContent = text;
       exportT.textContent = text;
     }
+
+    if (msg.type === "export-preview-progress") {
+      progress.hidden = !msg.payload.running;
+      if (msg.payload.running) grid.innerHTML = "";
+    }
+
+    if (msg.type === "export-preview-result") {
+      progress.hidden = true;
+      grid.innerHTML = "";
+      if (!msg.payload.ok) {
+        showToast(msg.payload.error || "Preview failed");
+        return;
+      }
+      const items = msg.payload.items || [];
+      if (items.length === 0) {
+        showToast("Nothing selected to preview");
+        return;
+      }
+      for (const it of items) {
+        const url = bytesToUrl(it.bytes);
+        const card = document.createElement("div");
+        card.className = "card";
+        const head = document.createElement("div");
+        head.className = "card-head";
+        const path = document.createElement("div");
+        path.className = "card-path";
+        path.textContent = it.virtualPath;
+        const meta = document.createElement("div");
+        meta.className = "card-meta";
+        meta.textContent = `${it.variant} • #${it.index}`;
+        head.appendChild(path);
+        head.appendChild(meta);
+        const img = document.createElement("img");
+        img.className = "card-img";
+        img.src = url;
+        img.alt = it.filename;
+        card.appendChild(head);
+        card.appendChild(img);
+        grid.appendChild(card);
+      }
+      showToast(`Preview ready • ${items.length} file(s)`);
+    }
   };
 
-  // For standalone preview (without code.js), seed a fake status:
+  // Seed fake target text when running UI alone (not needed in plugin)
   setTimeout(() => {
     if (syncT.textContent.includes('0 selected')) {
       const fake = 'Target: 2 selected (2 frame-like) • Sections: 2025-09-10_Climate-Report';
